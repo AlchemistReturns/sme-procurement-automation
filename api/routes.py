@@ -31,7 +31,7 @@ async def validate_procurement_item(item: BOMLineItemCreate):
         master_status=master_result["status"],
         master_message=master_result["message"],
         confidence_score=vd.get("confidence_score"),
-        requires_human_review=vd.get("confidence_score", 1.0) < 0.8,
+        requires_human_review=vd.get("confidence_score", 1.0) < 0.75,
         reasoning=vd.get("reasoning"),
         suggested_category=vd.get("suggested_category")
     )
