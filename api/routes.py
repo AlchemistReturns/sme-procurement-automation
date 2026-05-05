@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from uuid import UUID, uuid4
 from schemas.procurement import BOMLineItemCreate, BOMLineItemResponse
-from agents.bom_input_agent import validate_bom_item
+from core_agents.master_agent import run_master_agent
 
 router = APIRouter(
     prefix="/procurement",
@@ -16,19 +16,24 @@ async def validate_procurement_item(item: BOMLineItemCreate):
     """
     Validate a single BOM line item for procurement.
     """
-    validation_result = await validate_bom_item(
+    # Call the Master Agent
+    master_result = await run_master_agent(
         category=item.category, 
-        sku_or_description=item.sku_or_description, 
+        description=item.sku_or_description, 
         quantity=item.quantity
     )
+    
+    vd = master_result["validation_details"] or {}
     
     response = BOMLineItemResponse(
         id=uuid4(),
         **item.model_dump(),
-        confidence_score=validation_result.confidence_score,
-        requires_human_review=validation_result.requires_human_review,
-        reasoning=validation_result.reasoning,
-        suggested_category=validation_result.suggested_category
+        master_status=master_result["status"],
+        master_message=master_result["message"],
+        confidence_score=vd.get("confidence_score"),
+        requires_human_review=vd.get("confidence_score", 1.0) < 0.8,
+        reasoning=vd.get("reasoning"),
+        suggested_category=vd.get("suggested_category")
     )
     
     mock_db[response.id] = response

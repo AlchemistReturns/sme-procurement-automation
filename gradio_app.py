@@ -1,7 +1,6 @@
 import gradio as gr
-from agents.bom_input_agent import validate_bom_item, BOMValidationResult
+from core_agents.master_agent import run_master_agent
 from dotenv import load_dotenv
-import asyncio
 
 # Load environment variables (like OPENAI_API_KEY)
 load_dotenv()
@@ -17,22 +16,22 @@ async def process_bom_item(category, description, quantity):
     except ValueError:
         return "Error", "Quantity must be a valid integer."
 
-    # Call the async agent
-    result: BOMValidationResult = await validate_bom_item(category, description, quantity)
+    # Call the Master Agent
+    master_result = await run_master_agent(category, description, quantity)
     
-    status = "Requires Human Review" if result.requires_human_review else "Approved for Sourcing"
+    status = master_result["status"]
+    message = master_result["message"]
+    details = ""
     
-    details = f"""
-**Confidence Score**: {result.confidence_score}
-**Status**: {status}
-
-**Reasoning**: 
-{result.reasoning}
-"""
-    if result.suggested_category:
-        details += f"\n**Suggested Category**: {result.suggested_category}"
-        
-    return status, details
+    if master_result["validation_details"]:
+        vd = master_result["validation_details"]
+        details = f"**Agent Tool Output (Confidence: {vd['confidence_score']})**\n"
+        if vd.get("suggested_category"):
+            details += f"Suggested Category: {vd['suggested_category']}\n"
+    
+    final_output = f"{message}\n\n---\n{details}"
+    
+    return status, final_output
 
 # Define the Gradio Interface
 with gr.Blocks(title="SME Procurement - BOM Validation") as demo:

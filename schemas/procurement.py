@@ -12,6 +12,8 @@ class BOMLineItemCreate(BOMLineItemBase):
 
 class BOMLineItemResponse(BOMLineItemBase):
     id: UUID
+    master_status: str = Field(..., description="The status determined by the Master Agent")
+    master_message: str = Field(..., description="The final message output from the Master Agent")
     confidence_score: Optional[float] = Field(None, description="AI confidence score for validation")
     requires_human_review: bool = False
     reasoning: Optional[str] = Field(None, description="Agent reasoning for the validation score")
