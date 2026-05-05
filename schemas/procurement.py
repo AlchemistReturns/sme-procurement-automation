@@ -2,13 +2,24 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID, uuid4
 
+
+class SupplierCandidate(BaseModel):
+    name: str
+    website: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
+    relevance_summary: str
+
+
 class BOMLineItemBase(BaseModel):
     category: str = Field(..., description="The category of the item (e.g., Electronics, Metals)")
     sku_or_description: str = Field(..., description="SKU or detailed description of the part")
     quantity: int = Field(..., gt=0, description="Quantity required")
 
+
 class BOMLineItemCreate(BOMLineItemBase):
     pass
+
 
 class BOMLineItemResponse(BOMLineItemBase):
     id: UUID
@@ -18,3 +29,4 @@ class BOMLineItemResponse(BOMLineItemBase):
     requires_human_review: bool = False
     reasoning: Optional[str] = Field(None, description="Agent reasoning for the validation score")
     suggested_category: Optional[str] = Field(None, description="Suggested category if the original was wrong")
+    suppliers: Optional[list[SupplierCandidate]] = Field(None, description="Discovered supplier candidates")

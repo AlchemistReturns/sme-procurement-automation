@@ -24,7 +24,9 @@ async def validate_procurement_item(item: BOMLineItemCreate):
     )
     
     vd = master_result["validation_details"] or {}
-    
+    sd = master_result.get("supplier_discovery") or {}
+    suppliers_raw = sd.get("suppliers")
+
     response = BOMLineItemResponse(
         id=uuid4(),
         **item.model_dump(),
@@ -33,7 +35,8 @@ async def validate_procurement_item(item: BOMLineItemCreate):
         confidence_score=vd.get("confidence_score"),
         requires_human_review=vd.get("confidence_score", 1.0) < 0.75,
         reasoning=vd.get("reasoning"),
-        suggested_category=vd.get("suggested_category")
+        suggested_category=vd.get("suggested_category"),
+        suppliers=suppliers_raw,
     )
     
     mock_db[response.id] = response
