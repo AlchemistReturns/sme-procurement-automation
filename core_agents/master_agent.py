@@ -1,6 +1,8 @@
+import json
 from agents import Agent, Runner, function_tool, ToolCallOutputItem
 from core_agents.bom_input_agent import validate_bom_item, BOMValidationResult
-from core_agents.supplier_discovery_agent import run_supplier_discovery, SupplierDiscoveryResult
+from core_agents.supplier_discovery_agent import run_supplier_discovery, SupplierDiscoveryResult, SupplierCandidate
+from core_agents.supplier_enrichment_agent import run_supplier_enrichment
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -13,7 +15,8 @@ Step 1: You MUST first validate any new BOM items using the `validate_bom` tool.
 Step 2: Evaluate the result from the `validate_bom` tool.
 - If the tool returns a confidence score < 0.75, you must STOP and return a message asking for human review, clearly stating the reasoning provided by the tool.
 - If the confidence score is >= 0.75, you MUST call the `discover_suppliers` tool with the same item details.
-Step 3: Present the supplier discovery results clearly, listing each supplier with their website and contact info.
+Step 3: Take the suppliers JSON returned by `discover_suppliers` and pass it directly to `enrich_suppliers`.
+Step 4: Present the enriched supplier results clearly, listing each supplier with their website, email, and phone.
 
 Output your final response in clear, concise markdown format."""
 
@@ -32,10 +35,19 @@ async def discover_suppliers(item_category: str, item_description: str, item_qua
     return result.model_dump_json()
 
 
+@function_tool
+async def enrich_suppliers(suppliers_json: str) -> str:
+    """Enriches supplier list with email and phone scraped from their websites.
+    Accepts the JSON string returned by discover_suppliers. Returns enriched JSON array."""
+    discovery = SupplierDiscoveryResult.model_validate_json(suppliers_json)
+    enriched = await run_supplier_enrichment(discovery.suppliers)
+    return json.dumps([s.model_dump() for s in enriched])
+
+
 _agent = Agent(
     name="Master Procurement Agent",
     instructions=system_prompt,
-    tools=[validate_bom, discover_suppliers],
+    tools=[validate_bom, discover_suppliers, enrich_suppliers],
 )
 
 
@@ -47,6 +59,7 @@ async def run_master_agent(category: str, description: str, quantity: int):
 
     val_result = None
     supplier_result = None
+    enriched_suppliers = None
     for item in result.new_items:
         if isinstance(item, ToolCallOutputItem):
             if val_result is None:
@@ -58,6 +71,13 @@ async def run_master_agent(category: str, description: str, quantity: int):
             if val_result is not None and supplier_result is None:
                 try:
                     supplier_result = SupplierDiscoveryResult.model_validate_json(item.output)
+                    continue
+                except Exception:
+                    pass
+            if supplier_result is not None and enriched_suppliers is None:
+                try:
+                    raw = json.loads(item.output)
+                    enriched_suppliers = [SupplierCandidate.model_validate(s) for s in raw]
                 except Exception:
                     pass
 
@@ -65,9 +85,12 @@ async def run_master_agent(category: str, description: str, quantity: int):
     if val_result:
         status = "Requires Human Review" if val_result.confidence_score < CONFIDENCE_THRESHOLD else "Ready for Discovery"
 
+    suppliers_out = enriched_suppliers or (supplier_result.suppliers if supplier_result else None)
+
     return {
         "status": status,
         "message": result.final_output,
         "validation_details": val_result.model_dump() if val_result else None,
         "supplier_discovery": supplier_result.model_dump() if supplier_result else None,
+        "enriched_suppliers": [s.model_dump() for s in suppliers_out] if suppliers_out else None,
     }

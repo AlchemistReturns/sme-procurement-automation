@@ -15,7 +15,7 @@ Step 1: Use the Exa search tool to search for:
   "{description} {category} supplier manufacturer distributor"
   Use neural/semantic search mode for best results.
 
-Step 2: For each promising result (up to 15), use Apollo.io to look up
+Step 2: For each promising result (up to 8), use Apollo.io to look up
   the company and retrieve contact email and phone if available.
 
 Step 3: Return your findings as a SupplierDiscoveryResult with the

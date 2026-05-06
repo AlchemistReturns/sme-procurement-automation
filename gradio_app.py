@@ -99,8 +99,14 @@ async def process_bom_item(category, description, quantity):
         lines.append(f"**Suggested Category:** {vd['suggested_category']}")
     validation_md = "\n\n".join(lines)
 
-    supplier_md = _format_suppliers(master_result.get("supplier_discovery"))
-    show_retry = status == "Ready for Discovery" and not master_result.get("supplier_discovery")
+    enriched = master_result.get("enriched_suppliers")
+    sd = master_result.get("supplier_discovery")
+    if enriched and sd:
+        display_sd = {**sd, "suppliers": enriched}
+    else:
+        display_sd = sd
+    supplier_md = _format_suppliers(display_sd)
+    show_retry = status == "Ready for Discovery" and not sd
 
     return status, validation_md, gr.update(visible=show_retry), supplier_md
 
